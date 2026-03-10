@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordRequestForm
@@ -10,14 +11,16 @@ from schemas import UserCreate, UserResponse, UserUpdate, ChangePassword
 from auth import create_access_token
 from dependencies import get_current_user
 
-# ✅ NEW — Email import
+
+# Email service
 from services.email_service import send_email
 
-# import routers
+# Routers
 from routers.likes_router import router as likes_router
 from routers.posts_router import router as posts_router
 from routers.comments_router import router as comments_router
 from routers.subscription_router import router as subscription_router
+
 
 import os
 
@@ -88,6 +91,23 @@ app = FastAPI(
 )
 
 
+# =====================================================
+# CORS MIDDLEWARE (for React frontend)
+# =====================================================
+origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173"
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 # -------------------------
 # Ensure media folder exists
 # -------------------------
@@ -107,6 +127,7 @@ app.include_router(likes_router)
 app.include_router(posts_router)
 app.include_router(comments_router)
 app.include_router(subscription_router)
+
 
 
 # =====================================================
@@ -139,7 +160,7 @@ def signup(
     db.commit()
     db.refresh(new_user)
 
-    # ✅ Send welcome email in background
+    # Send welcome email
     background_tasks.add_task(
         send_email,
         subject="Welcome to FastAPI Blog 🎉",
@@ -246,7 +267,7 @@ async def test_email(background_tasks: BackgroundTasks):
     background_tasks.add_task(
         send_email,
         subject="Test Email",
-        recipient="your_test_email@example.com",  # ⬅️ change this
+        recipient="your_test_email@example.com",
         body="This is a test email from FastAPI."
     )
 

@@ -44,3 +44,15 @@ def add_comment(
     )
 
     return {"message": "Comment added successfully."}
+
+@router.get("/")
+def get_comments(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+
+    comments = db.query(Comment).filter(
+        Comment.user_id == current_user.id
+    ).all()
+
+    return comments

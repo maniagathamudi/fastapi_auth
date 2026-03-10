@@ -73,7 +73,7 @@ def like_post(
     db.commit()
     db.refresh(post)
 
-    # 7️⃣ Trigger Email Notification (MODULAR + BACKGROUND)
+    # 7️⃣ Trigger Email Notification
     background_tasks.add_task(
         notify_post_owner,
         post,
@@ -82,3 +82,15 @@ def like_post(
     )
 
     return {"message": "Post liked successfully."}
+
+@router.get("/")
+def get_likes(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+
+    likes = db.query(Like).filter(
+        Like.user_id == current_user.id
+    ).all()
+
+    return likes
