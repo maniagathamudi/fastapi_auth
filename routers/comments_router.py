@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 
 from database import get_db
-from models import Post, Comment, User
+from models import Post, Comment, User, Notification
 from dependencies import get_current_user
 from services.notification_service import notify_post_owner
 
@@ -19,12 +19,10 @@ def add_comment(
     current_user: User = Depends(get_current_user)
 ):
 
-    # 1️⃣ Check if post exists
     post = db.query(Post).filter(Post.id == post_id).first()
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
 
-    # 2️⃣ Create comment
     new_comment = Comment(
         content=content,
         post_id=post_id,
@@ -35,15 +33,26 @@ def add_comment(
     db.commit()
     db.refresh(post)
 
-    # 3️⃣ Trigger Email Notification
+    # 🔔 Save notification
+    if post.author_id != current_user.id:
+        notification = Notification(
+            user_id=post.author_id,
+            message=f"{current_user.email} commented on your post '{post.title}' 💬",
+            type="comment"
+        )
+
+        db.add(notification)
+        db.commit()
+
     background_tasks.add_task(
         notify_post_owner,
         post,
         current_user,
-        "Comment"
+        "commented on"
     )
 
     return {"message": "Comment added successfully."}
+
 
 @router.get("/")
 def get_comments(

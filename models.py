@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, UniqueConstraint, DateTime, Float
+from sqlalchemy import Column, Integer, String, ForeignKey, UniqueConstraint, DateTime, Float, Text
 from sqlalchemy.orm import relationship
 from database import Base
 from datetime import datetime
@@ -150,3 +150,43 @@ class BillingHistory(Base):
 
     user = relationship("User", back_populates="billing_history")
     plan = relationship("SubscriptionPlan", back_populates="billing_records")
+
+
+# =========================================================
+# NOTIFICATION MODEL
+# =========================================================
+class Notification(Base):
+
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
+    message = Column(String, nullable=False)
+
+    type = Column(String, nullable=False)
+
+    is_read = Column(Integer, default=0)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+
+
+# =========================================================
+# AI SUPPORT CHAT MODEL
+# =========================================================
+class AIChatLog(Base):
+
+    __tablename__ = "ai_chat_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    user_id = Column(Integer, ForeignKey("users.id"))
+
+    question = Column(Text)
+
+    answer = Column(Text)
+
+    created_at = Column(DateTime, default=datetime.utcnow)

@@ -5,12 +5,18 @@ from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordRequestForm
 
+import os
+
+# Database
 from database import Base, engine, get_db, SessionLocal
+
+# Models & Schemas
 from models import User, SubscriptionPlan
 from schemas import UserCreate, UserResponse, UserUpdate, ChangePassword
+
+# Auth
 from auth import create_access_token
 from dependencies import get_current_user
-
 
 # Email service
 from services.email_service import send_email
@@ -20,13 +26,12 @@ from routers.likes_router import router as likes_router
 from routers.posts_router import router as posts_router
 from routers.comments_router import router as comments_router
 from routers.subscription_router import router as subscription_router
-
-
-import os
+from routers.notification_router import router as notification_router
+from routers.ai_support_router import router as ai_support_router
 
 
 # -------------------------
-# Password hashing setup
+# Password hashing
 # -------------------------
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -35,51 +40,6 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # Create database tables
 # -------------------------
 Base.metadata.create_all(bind=engine)
-
-
-# -------------------------
-# Create default subscription plans
-# -------------------------
-def create_default_plans():
-    db = SessionLocal()
-
-    existing = db.query(SubscriptionPlan).count()
-
-    if existing == 0:
-        plans = [
-            SubscriptionPlan(
-                name="Basic",
-                price=199,
-                post_limit=1,
-                image_limit=1,
-                like_limit=5,
-                comment_limit=5
-            ),
-            SubscriptionPlan(
-                name="Premium",
-                price=499,
-                post_limit=2,
-                image_limit=2,
-                like_limit=20,
-                comment_limit=20
-            ),
-            SubscriptionPlan(
-                name="Pro",
-                price=999,
-                post_limit=9999,
-                image_limit=9999,
-                like_limit=9999,
-                comment_limit=9999
-            ),
-        ]
-
-        db.add_all(plans)
-        db.commit()
-
-    db.close()
-
-
-create_default_plans()
 
 
 # -------------------------
@@ -92,7 +52,7 @@ app = FastAPI(
 
 
 # =====================================================
-# CORS MIDDLEWARE (for React frontend)
+# CORS (React frontend support)
 # =====================================================
 origins = [
     "http://localhost:5173",
@@ -108,34 +68,89 @@ app.add_middleware(
 )
 
 
-# -------------------------
+# =====================================================
 # Ensure media folder exists
-# -------------------------
+# =====================================================
 os.makedirs("media/invoices", exist_ok=True)
 
 
 # -------------------------
-# Mount media folder
+# Static media
 # -------------------------
 app.mount("/media", StaticFiles(directory="media"), name="media")
 
 
-# -------------------------
-# Include routers
-# -------------------------
+# =====================================================
+# CREATE DEFAULT PLANS
+# =====================================================
+def create_default_plans():
+
+    db = SessionLocal()
+
+    try:
+        existing = db.query(SubscriptionPlan).count()
+
+        if existing == 0:
+
+            plans = [
+
+                SubscriptionPlan(
+                    name="Basic",
+                    price=199,
+                    post_limit=1,
+                    image_limit=1,
+                    like_limit=5,
+                    comment_limit=5
+                ),
+
+                SubscriptionPlan(
+                    name="Premium",
+                    price=499,
+                    post_limit=2,
+                    image_limit=2,
+                    like_limit=20,
+                    comment_limit=20
+                ),
+
+                SubscriptionPlan(
+                    name="Pro",
+                    price=999,
+                    post_limit=9999,
+                    image_limit=9999,
+                    like_limit=9999,
+                    comment_limit=9999
+                ),
+            ]
+
+            db.add_all(plans)
+            db.commit()
+
+    finally:
+        db.close()
+
+
+@app.on_event("startup")
+def startup_event():
+    create_default_plans()
+
+
+# =====================================================
+# INCLUDE ROUTERS
+# =====================================================
 app.include_router(likes_router)
 app.include_router(posts_router)
 app.include_router(comments_router)
 app.include_router(subscription_router)
-
+app.include_router(notification_router)
+app.include_router(ai_support_router)
 
 
 # =====================================================
-# AUTHENTICATION ENDPOINTS
+# AUTHENTICATION
 # =====================================================
 
 # -------------------------
-# Signup endpoint
+# Signup
 # -------------------------
 @app.post("/signup")
 def signup(
@@ -160,7 +175,6 @@ def signup(
     db.commit()
     db.refresh(new_user)
 
-    # Send welcome email
     background_tasks.add_task(
         send_email,
         subject="Welcome to FastAPI Blog 🎉",
@@ -172,7 +186,7 @@ def signup(
 
 
 # -------------------------
-# Signin endpoint
+# Signin
 # -------------------------
 @app.post("/signin")
 def signin(
@@ -196,17 +210,15 @@ def signin(
     }
 
 
-# -------------------------
-# Get profile endpoint
-# -------------------------
+# =====================================================
+# USER PROFILE
+# =====================================================
+
 @app.get("/profile", response_model=UserResponse)
 def profile(current_user: User = Depends(get_current_user)):
     return current_user
 
 
-# -------------------------
-# Edit profile endpoint
-# -------------------------
 @app.put("/edit-profile")
 def edit_profile(
     data: UserUpdate,
@@ -223,9 +235,6 @@ def edit_profile(
     return {"message": "Profile updated successfully"}
 
 
-# -------------------------
-# Change password endpoint
-# -------------------------
 @app.put("/change-password")
 def change_password(
     data: ChangePassword,
@@ -243,9 +252,6 @@ def change_password(
     return {"message": "Password changed successfully"}
 
 
-# -------------------------
-# Delete account endpoint
-# -------------------------
 @app.delete("/delete-account")
 def delete_account(
     db: Session = Depends(get_db),
@@ -259,10 +265,10 @@ def delete_account(
 
 
 # =====================================================
-# EMAIL TEST ENDPOINT
+# EMAIL TEST
 # =====================================================
 @app.get("/test-email")
-async def test_email(background_tasks: BackgroundTasks):
+def test_email(background_tasks: BackgroundTasks):
 
     background_tasks.add_task(
         send_email,
@@ -274,9 +280,9 @@ async def test_email(background_tasks: BackgroundTasks):
     return {"message": "Email triggered successfully"}
 
 
-# -------------------------
-# Root endpoint
-# -------------------------
+# =====================================================
+# ROOT
+# =====================================================
 @app.get("/")
 def root():
     return {"message": "API working successfully 🚀"}

@@ -9,20 +9,27 @@ import Profile from "./pages/profile";
 import Comments from "./pages/comments";
 import Likes from "./pages/Likes";
 
+import AIChat from "./components/AIChat";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 function App() {
-
   return (
-
     <BrowserRouter>
-
       <Routes>
-
         {/* Login Page */}
         <Route path="/" element={<Login />} />
 
-        {/* Dashboard / Home */}
+        {/* Home Page */}
+        <Route
+          path="/home"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Dashboard */}
         <Route
           path="/dashboard"
           element={
@@ -52,7 +59,7 @@ function App() {
           }
         />
 
-        {/* Subscription Plans */}
+        {/* Subscription */}
         <Route
           path="/plans"
           element={
@@ -91,13 +98,12 @@ function App() {
             </ProtectedRoute>
           }
         />
-
       </Routes>
 
+      {/* Floating AI Support Chat */}
+      <AIChat />
     </BrowserRouter>
-
   );
-
 }
 
 export default App;
