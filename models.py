@@ -39,14 +39,23 @@ class User(Base):
 # =========================================================
 # POST MODEL
 # =========================================================
+# =========================================================
+# POST MODEL
+# =========================================================
 class Post(Base):
 
     __tablename__ = "posts"
 
     id = Column(Integer, primary_key=True, index=True)
+
     title = Column(String, nullable=False)
     content = Column(String, nullable=False)
     image = Column(String, nullable=True)
+
+    # NEW FIELDS
+    status = Column(String, default="draft")  # draft | scheduled | published
+    scheduled_at = Column(DateTime, nullable=True)
+    published_at = Column(DateTime, nullable=True)
 
     author_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
 

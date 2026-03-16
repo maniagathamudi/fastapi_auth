@@ -6,22 +6,33 @@ from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordRequestForm
 
 import os
+import threading
 
+# -------------------------
 # Database
+# -------------------------
 from database import Base, engine, get_db, SessionLocal
 
+# -------------------------
 # Models & Schemas
+# -------------------------
 from models import User, SubscriptionPlan
 from schemas import UserCreate, UserResponse, UserUpdate, ChangePassword
 
+# -------------------------
 # Auth
+# -------------------------
 from auth import create_access_token
 from dependencies import get_current_user
 
+# -------------------------
 # Email service
+# -------------------------
 from services.email_service import send_email
 
+# -------------------------
 # Routers
+# -------------------------
 from routers.likes_router import router as likes_router
 from routers.posts_router import router as posts_router
 from routers.comments_router import router as comments_router
@@ -29,30 +40,36 @@ from routers.subscription_router import router as subscription_router
 from routers.notification_router import router as notification_router
 from routers.ai_support_router import router as ai_support_router
 
+# -------------------------
+# Scheduler
+# -------------------------
+from scheduler import check_scheduled_posts
 
-# -------------------------
-# Password hashing
-# -------------------------
+
+# =====================================================
+# Password Hashing
+# =====================================================
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
-# -------------------------
-# Create database tables
-# -------------------------
+# =====================================================
+# Create Database Tables
+# =====================================================
 Base.metadata.create_all(bind=engine)
 
 
-# -------------------------
-# Create FastAPI app
-# -------------------------
+# =====================================================
+# Create FastAPI App
+# =====================================================
 app = FastAPI(
     title="FastAPI Blog API",
-    version="2.1.0"
+    version="3.1.0",
+    description="Full Stack Blog Platform API"
 )
 
 
 # =====================================================
-# CORS (React frontend support)
+# CORS CONFIGURATION (React Frontend Support)
 # =====================================================
 origins = [
     "http://localhost:5173",
@@ -69,25 +86,23 @@ app.add_middleware(
 
 
 # =====================================================
-# Ensure media folder exists
+# MEDIA FOLDERS
 # =====================================================
 os.makedirs("media/invoices", exist_ok=True)
+os.makedirs("media/posts", exist_ok=True)
 
-
-# -------------------------
-# Static media
-# -------------------------
 app.mount("/media", StaticFiles(directory="media"), name="media")
 
 
 # =====================================================
-# CREATE DEFAULT PLANS
+# CREATE DEFAULT SUBSCRIPTION PLANS
 # =====================================================
 def create_default_plans():
 
     db = SessionLocal()
 
     try:
+
         existing = db.query(SubscriptionPlan).count()
 
         if existing == 0:
@@ -125,13 +140,29 @@ def create_default_plans():
             db.add_all(plans)
             db.commit()
 
+            print("Default subscription plans created")
+
     finally:
         db.close()
 
 
+# =====================================================
+# STARTUP EVENT
+# =====================================================
 @app.on_event("startup")
 def startup_event():
+
+    print("Starting FastAPI Blog API...")
+
+    # Create default subscription plans
     create_default_plans()
+
+    # Start scheduler thread
+    scheduler_thread = threading.Thread(target=check_scheduled_posts)
+    scheduler_thread.daemon = True
+    scheduler_thread.start()
+
+    print("Scheduler started")
 
 
 # =====================================================
@@ -175,6 +206,7 @@ def signup(
     db.commit()
     db.refresh(new_user)
 
+    # Send welcome email
     background_tasks.add_task(
         send_email,
         subject="Welcome to FastAPI Blog 🎉",
@@ -285,4 +317,4 @@ def test_email(background_tasks: BackgroundTasks):
 # =====================================================
 @app.get("/")
 def root():
-    return {"message": "API working successfully 🚀"}
+    return {"message": "FastAPI Blog API running successfully 🚀"}

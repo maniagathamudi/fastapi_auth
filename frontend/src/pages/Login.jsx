@@ -1,14 +1,23 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { useAuth0 } from "@auth0/auth0-react";
 import API from "../api";
 
 function Login() {
 
   const navigate = useNavigate();
+  const { loginWithRedirect, isAuthenticated, user, isLoading } = useAuth0();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      console.log("Auth0 User:", user);
+      navigate("/dashboard");
+    }
+  }, [isAuthenticated, user, navigate]);
 
   const loginUser = async (e) => {
     e.preventDefault();
@@ -22,8 +31,8 @@ function Login() {
 
       const response = await API.post("/signin", formData);
 
-      // store token
-      localStorage.setItem("token", response.data.access_token);
+      // FIXED TOKEN STORAGE
+      localStorage.setItem("access_token", response.data.access_token);
 
       alert("Login Successful 🎉");
 
@@ -39,43 +48,69 @@ function Login() {
     }
   };
 
-  return (
-    <div
-      style={{
+  if (isLoading) {
+    return (
+      <div style={{
+        height: "100vh",
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
+        fontSize: "20px"
+      }}>
+        Loading...
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
         height: "100vh",
-        background: "#f5f5f5"
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        background: "linear-gradient(135deg,#0f2027,#203a43,#2c5364)",
+        fontFamily: "Segoe UI"
       }}
     >
+
       <form
         onSubmit={loginUser}
         style={{
           padding: "40px",
-          border: "1px solid #ddd",
-          borderRadius: "10px",
-          width: "320px",
+          borderRadius: "14px",
+          width: "360px",
           textAlign: "center",
-          background: "white",
-          boxShadow: "0 2px 10px rgba(0,0,0,0.1)"
+          background: "rgba(255,255,255,0.08)",
+          backdropFilter: "blur(10px)",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+          color: "white"
         }}
       >
 
-        <h2 style={{ marginBottom: "20px" }}>Login</h2>
+        <h1 style={{ color: "#7c8cff", marginBottom: "5px" }}>
+          BlogPlatform
+        </h1>
+
+        <p style={{ color: "#ccc", marginBottom: "25px" }}>
+          Welcome back 👋
+        </p>
 
         <input
           type="email"
-          placeholder="Email"
+          placeholder="Email Address"
           value={email}
           required
           onChange={(e) => setEmail(e.target.value)}
           style={{
             width: "100%",
-            padding: "10px",
-            marginBottom: "12px",
-            borderRadius: "5px",
-            border: "1px solid #ccc"
+            padding: "12px",
+            marginBottom: "15px",
+            borderRadius: "8px",
+            border: "none",
+            background: "#1e2a44",
+            color: "white",
+            outline: "none"
           }}
         />
 
@@ -87,10 +122,13 @@ function Login() {
           onChange={(e) => setPassword(e.target.value)}
           style={{
             width: "100%",
-            padding: "10px",
-            marginBottom: "15px",
-            borderRadius: "5px",
-            border: "1px solid #ccc"
+            padding: "12px",
+            marginBottom: "18px",
+            borderRadius: "8px",
+            border: "none",
+            background: "#1e2a44",
+            color: "white",
+            outline: "none"
           }}
         />
 
@@ -99,24 +137,69 @@ function Login() {
           disabled={loading}
           style={{
             width: "100%",
-            padding: "10px",
-            backgroundColor: "black",
+            padding: "12px",
+            background: "#4f6cff",
             color: "white",
             border: "none",
-            borderRadius: "5px",
-            cursor: "pointer"
+            borderRadius: "8px",
+            fontSize: "16px",
+            cursor: "pointer",
+            marginBottom: "18px"
           }}
         >
           {loading ? "Logging in..." : "Login"}
         </button>
 
-        {/* Register Link */}
-        <p style={{ marginTop: "15px", fontSize: "14px" }}>
+        <p style={{ margin: "15px 0", color: "#aaa" }}>OR</p>
+
+        <button
+          type="button"
+          onClick={() =>
+            loginWithRedirect({
+              authorizationParams: { connection: "google-oauth2" }
+            })
+          }
+          style={{
+            width: "100%",
+            padding: "12px",
+            marginBottom: "10px",
+            background: "#ea4335",
+            color: "white",
+            border: "none",
+            borderRadius: "8px"
+          }}
+        >
+          Continue with Google
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            loginWithRedirect({
+              authorizationParams: { connection: "facebook" }
+            })
+          }
+          style={{
+            width: "100%",
+            padding: "12px",
+            background: "#1877f2",
+            color: "white",
+            border: "none",
+            borderRadius: "8px"
+          }}
+        >
+          Continue with Facebook
+        </button>
+
+        <p style={{ marginTop: "20px", fontSize: "14px", color: "#ccc" }}>
           Don't have an account?{" "}
-          <Link to="/register">Register</Link>
+          <Link to="/register" style={{ color: "#7c8cff" }}>
+            Register
+          </Link>
         </p>
 
       </form>
+
     </div>
   );
 }

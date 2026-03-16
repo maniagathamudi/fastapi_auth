@@ -73,3 +73,34 @@ class LikeResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+from datetime import datetime
+
+# -------------------------
+# CREATE POST
+# -------------------------
+class PostCreate(BaseModel):
+
+    title: str
+    content: str
+    scheduled_at: Optional[datetime] = None
+
+
+# -------------------------
+# UPDATED POST RESPONSE
+# -------------------------
+class PostResponse(BaseModel):
+
+    id: int
+    title: str
+    content: str
+    image: Optional[str]
+
+    status: str
+    scheduled_at: Optional[datetime]
+    published_at: Optional[datetime]
+
+    author_id: int
+
+    class Config:
+        from_attributes = True        

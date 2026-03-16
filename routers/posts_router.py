@@ -1,11 +1,12 @@
 import os
 import shutil
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Query
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
 from sqlalchemy.orm import Session
 from typing import Optional
 
 import models, schemas
 from dependencies import get_db, get_current_user
+
 
 router = APIRouter(
     prefix="/posts",
@@ -13,60 +14,53 @@ router = APIRouter(
 )
 
 UPLOAD_DIR = "media/posts"
-
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 # CREATE POST WITH IMAGE
-# CREATE POST WITH IMAGE
+from datetime import datetime
+
 @router.post("/", response_model=schemas.PostResponse)
 def create_post(
     title: str = Form(...),
     content: str = Form(...),
+    publish_option: str = Form("publish"),  # publish | draft | schedule
+    scheduled_at: Optional[str] = Form(None),
     image: UploadFile = File(None),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
 
-    # 1️⃣ Check subscription
-    subscription = db.query(models.UserSubscription).filter(
-        models.UserSubscription.user_id == current_user.id
-    ).first()
+    status = "published"
+    publish_time = None
 
-    if not subscription:
-        raise HTTPException(
-            status_code=403,
-            detail="Please subscribe to a plan first."
-        )
+    # -------------------------
+    # DRAFT
+    # -------------------------
+    if publish_option == "draft":
+        status = "draft"
 
-    plan = subscription.plan
+    # -------------------------
+    # SCHEDULE
+    # -------------------------
+    elif publish_option == "schedule":
 
-    # 2️⃣ Check POST LIMIT (handle unlimited = -1)
-    user_post_count = db.query(models.Post).filter(
-        models.Post.author_id == current_user.id
-    ).count()
+        if not scheduled_at:
+            raise HTTPException(status_code=400, detail="scheduled_at required")
 
-    if plan.post_limit != -1 and user_post_count >= plan.post_limit:
-        raise HTTPException(
-            status_code=403,
-            detail="Post limit reached. Upgrade your plan."
-        )
+        publish_time = datetime.fromisoformat(scheduled_at)
 
-    # 3️⃣ Check IMAGE LIMIT (only if image uploaded)
+        if publish_time <= datetime.utcnow():
+            raise HTTPException(status_code=400, detail="scheduled_at must be future")
+
+        status = "scheduled"
+
+    # -------------------------
+    # IMAGE UPLOAD
+    # -------------------------
     image_path = None
 
     if image:
-
-        user_image_count = db.query(models.Post).filter(
-            models.Post.author_id == current_user.id,
-            models.Post.image != None
-        ).count()
-
-        if plan.image_limit != -1 and user_image_count >= plan.image_limit:
-            raise HTTPException(
-                status_code=403,
-                detail="Image upload limit reached. Upgrade your plan."
-            )
 
         file_location = f"{UPLOAD_DIR}/{image.filename}"
 
@@ -75,11 +69,20 @@ def create_post(
 
         image_path = file_location
 
-    # 4️⃣ Create post
+    # -------------------------
+    # CREATE POST
+    # -------------------------
     new_post = models.Post(
+
         title=title,
         content=content,
         image=image_path,
+
+        status=status,
+        scheduled_at=publish_time,
+
+        published_at=datetime.utcnow() if status == "published" else None,
+
         author_id=current_user.id
     )
 
@@ -88,7 +91,6 @@ def create_post(
     db.refresh(new_post)
 
     return new_post
-
 # GET POSTS WITH PAGINATION + SEARCH
 @router.get("/")
 def get_posts(
